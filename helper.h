@@ -45,9 +45,19 @@ Encrypt a vector of plaintexts.
 std::vector<Ciphertext> encrypt_vector(const std::unique_ptr<seal::Encryptor> &encryptor, const std::vector<Plaintext> plain);
 
 /*
+Encrypt a matrix of plaintexts.
+*/
+Matrix<Ciphertext> encrypt_matrix(const std::unique_ptr<seal::Encryptor> &encryptor, const Matrix<Plaintext> plain);
+
+/*
 Decrypt a vector of ciphertexts.
 */
 std::vector<Plaintext> decrypt_vector(const std::unique_ptr<seal::Decryptor> &decryptor, const std::vector<Ciphertext> encrypted);
+
+/*
+Decrypt a matrix of ciphertexts.
+*/
+Matrix<Plaintext> decrypt_vector(const std::unique_ptr<seal::Decryptor> &decryptor, const Matrix<Ciphertext> encrypted);
 
 /*
 Multiply a plaintext matrix by a plaintext vector. Pass a vector of encrypted zeros of appropiate size such that we don't need 
@@ -56,6 +66,11 @@ for that.
 */
 std::vector<Ciphertext> mult_matrix_vector(const std::unique_ptr<seal::Evaluator> &evaluator, const Matrix<Plaintext> plain_matrix, 
 	const std::vector<Ciphertext> encrypted, std::vector<Ciphertext> result);
+
+/*
+Print the noise budget for an encrypted vector.
+*/
+void print_noise_budget_vector(const std::unique_ptr<seal::Decryptor> &decryptor, const std::vector<Ciphertext> encrypted);
 
 /*
 Helper function: Prints the `parms_id' to std::ostream.

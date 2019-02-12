@@ -18,7 +18,7 @@ Integer Encoder for a vector of int messages.
 */
 std::vector<Plaintext> encode_vector(const std::unique_ptr<seal::IntegerEncoder> &encoder, const std::vector<int> message)
 {
-	vector<Plaintext> plain(message.size());
+	std::vector<Plaintext> plain(message.size());
 	for(int i = 0; i < message.size(); i++)
 		plain[i] = encoder->encode(message[i]);
 	return plain;
@@ -43,9 +43,12 @@ Integer Decoder for a vector of plaintexts.
 */
 std::vector<int> decode_vector(const std::unique_ptr<seal::IntegerEncoder> &encoder, const std::vector<Plaintext> plain)
 {
-	vector<int> message(plain.size());
+	std::vector<int> message(plain.size());
 	for(int i = 0; i < plain.size(); i++)
+    {
 		message[i] = encoder->decode_int32(plain[i]);
+    }
+
 	return message;
 }
 
@@ -54,10 +57,23 @@ Encrypt a vector of plaintexts.
 */
 std::vector<Ciphertext> encrypt_vector(const std::unique_ptr<seal::Encryptor> &encryptor, const std::vector<Plaintext> plain)
 {
-	vector<Ciphertext> encrypted(plain.size());
+	std::vector<Ciphertext> encrypted(plain.size());
 	for(int i = 0; i < plain.size(); i++)
 		encryptor->encrypt(plain[i], encrypted[i]);
 	return encrypted;
+}
+
+/*
+Encrypt a matrix of plaintexts. Pass an encryption of zero in order to be able to initialize the matrix, alternatively, pass 
+an encoder.
+*/
+Matrix<Ciphertext> encrypt_matrix(const std::unique_ptr<seal::Encryptor> &encryptor, const Matrix<Plaintext> plain, const Ciphertext enc_zero)
+{
+    Matrix<Ciphertext> encrypted(plain.get_rows(), plain.get_cols(), enc_zero);
+    for(int i = 0; i < plain.get_rows(); i++)
+        for(int j = 0; j < plain.get_cols(); j++)
+            encryptor->encrypt(plain(i,j), encrypted(i,j));
+    return encrypted;
 }
 
 /*
@@ -65,22 +81,21 @@ Decrypt a vector of ciphertexts.
 */
 std::vector<Plaintext> decrypt_vector(const std::unique_ptr<seal::Decryptor> &decryptor, const std::vector<Ciphertext> encrypted)
 {
-	vector<Plaintext> plain(encrypted.size());
+	std::vector<Plaintext> plain(encrypted.size());
 	for(int i = 0; i < encrypted.size(); i++)
 		decryptor->decrypt(encrypted[i], plain[i]);
 	return plain;
 }
 
-
 /*
-Multiply a plaintext matrix by a plaintext vector. Pass a vector of encrypted zeros of appropiate size such that we don't need 
+Multiply a plaintext matrix by a ciphertext vector. Pass a vector of encrypted zeros of appropiate size such that we don't need 
 to pass encoder and encryptor. SEAL does not allow multiplication by zero plaintexts, so we have to perform a separate check 
 for that.
 */
 std::vector<Ciphertext> mult_matrix_vector(const std::unique_ptr<seal::Evaluator> &evaluator, const Matrix<Plaintext> plain_matrix, 
 	const std::vector<Ciphertext> encrypted, std::vector<Ciphertext> result)
 {
-	vector<Ciphertext> temp = encrypted;
+	std::vector<Ciphertext> temp = encrypted;
 	try 
 	{
 		if (result.size() != plain_matrix.get_rows()) 
@@ -103,6 +118,43 @@ std::vector<Ciphertext> mult_matrix_vector(const std::unique_ptr<seal::Evaluator
 		cout << msg << endl;
 	}	
 	return result;
+}
+
+/*
+Multiply a ciphertext matrix by a ciphertext vector.
+*/
+std::vector<Ciphertext> mult_matrix_vector(const std::unique_ptr<seal::Evaluator> &evaluator, const Matrix<Ciphertext> enc_matrix, 
+    const std::vector<Ciphertext> encrypted)
+{
+    std::vector<Ciphertext> result(enc_matrix.get_rows());
+    std::vector<Ciphertext> temp = encrypted;
+    for(int i = 0; i < enc_matrix.get_rows(); i++)
+    {
+        for(int j = 0; j < enc_matrix.get_cols(); j++)
+        {
+            evaluator->multiply_inplace(temp[j], enc_matrix(i,j));
+            if(j!=0)
+            {
+                evaluator->add_inplace(result[i], temp[j]);
+            }
+            else
+            {
+                result[i] = temp[j];
+            }
+            temp = encrypted;
+        }
+    }
+    return result;
+}
+
+/*
+Print the noise budget for an encrypted vector.
+*/
+void print_noise_budget_vector(const std::unique_ptr<seal::Decryptor> &decryptor, const std::vector<Ciphertext> encrypted)
+{
+    for(int i = 0; i < encrypted.size(); i++)
+        cout << decryptor->invariant_noise_budget(encrypted[i]) << " bits; ";
+    cout << endl;
 }
 
 /*
